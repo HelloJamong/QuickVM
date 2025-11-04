@@ -27,8 +27,9 @@ cls
 echo ========================================
 echo  QuickVM - VM Optimization Tool
 echo  Version: 1.0.0
-echo  Last Updated: 2025-10-30
+echo  Last Updated: 2025-11-04
 echo ========================================
+:: 25-11-04 - 최초 코드 작성, 동작 테스트 필요함
 echo.
 echo  [Main Menu]
 echo.
