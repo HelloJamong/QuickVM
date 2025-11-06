@@ -1,17 +1,17 @@
 @echo off
-:: UTF-8 인코딩 설정
-chcp 65001 >nul
-:: 지연 환경 변수 확장 활성화
-setlocal enabledelayedexpansion
+echo BATCH FILE STARTED > QuickVM_debug.log
+chcp 65001 >nul 2>&1
+echo After chcp >> QuickVM_debug.log
 
-:: ============================================
-:: 관리자 권한 확인
-:: ============================================
 net session >nul 2>&1
-if %errorLevel% neq 0 (
+echo After net session, errorlevel=%errorlevel% >> QuickVM_debug.log
+
+if %errorlevel% neq 0 (
+    echo Not admin >> QuickVM_debug.log
+    cls
     echo.
     echo ========================================
-    echo  관리자 권한이 필요합니다!
+    echo  관리자 권한이 아닙니다.
     echo  관리자 권한으로 실행해주세요.
     echo ========================================
     echo.
@@ -19,18 +19,21 @@ if %errorLevel% neq 0 (
     exit /b
 )
 
+echo Has admin >> QuickVM_debug.log
+
 :: ============================================
 :: 메인 메뉴
 :: ============================================
 :MAIN_MENU
+echo Entered main menu >> QuickVM_debug.log
 cls
 echo ========================================
 echo  QuickVM - VM Optimization Tool
 echo  Version: 1.0.0
-echo  Last Updated: 2025-11-04
+echo  Last Updated: 2025-11-09
 echo ========================================
-:: 25-11-04 - 최초 코드 작성, 동작 테스트 필요함
-echo.
+:: 25-11-04 - 최초 코드 작성, 테스트 미진행 
+:: 25-11-09 - 배치파일 동작 확인, 로깅 기능 추가
 echo  [Main Menu]
 echo.
 echo  1. Remove unnecessary default programs
@@ -166,7 +169,7 @@ pause >nul
 goto MAIN_MENU
 
 :: ============================================
-:: 메뉴 2: 우클릭 메뉴를 Windows 10 스타일로 변경
+:: 메뉴 2: 오른쪽 메뉴를 Windows 10 스타일로 변경
 :: ============================================
 :MENU_2
 cls
@@ -192,7 +195,7 @@ echo Invalid input. Please try again.
 timeout /t 2 >nul
 goto MENU_2
 
-:: Windows 10 스타일 우클릭 메뉴로 변경
+:: Windows 10 스타일 오른쪽 메뉴로 변경
 :MENU_2_SUB_1
 cls
 echo ========================================
@@ -223,7 +226,7 @@ echo Press any key to return to main menu...
 pause >nul
 goto MAIN_MENU
 
-:: 우클릭 메뉴를 기본값(Windows 11 스타일)으로 복원
+:: 오른쪽 메뉴를 기본값 Windows 11 스타일로 복원
 :MENU_2_SUB_2
 cls
 echo ========================================
@@ -314,14 +317,14 @@ reg.exe add "HKEY_CURRENT_USER\Control Panel\PowerCfg" /v "GlobalFlags" /t REG_D
 reg.exe add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FlyoutMenuSettings" /v "ShowLockOption" /t REG_DWORD /d "0" /f >nul 2>&1
 echo Power button lock option disabled
 
-:: 디스플레이 끄기를 '안 함'으로 설정
+:: 디스플레이 끄기를 '안함'으로 설정
 echo [3/4] Setting display turn off to Never...
 :: 현재 활성 전원 구성표 GUID 가져오기
 for /f "tokens=4" %%i in ('powercfg /getactivescheme') do set ACTIVE_SCHEME=%%i
-:: 모니터 타임아웃을 0(안 함)으로 설정 (AC 및 DC 모두)
+:: 모니터 타임아웃을 0(안함)으로 설정 (AC 및 DC 모두)
 powercfg /change monitor-timeout-ac 0 >nul 2>&1
 powercfg /change monitor-timeout-dc 0 >nul 2>&1
-:: 레지스트리를 통해서도 설정
+:: 레지스트리로 추가해도 설정
 powercfg /setacvalueindex %ACTIVE_SCHEME% 7516b95f-f776-4464-8c53-06167f40cc99 3c0bc021-c8a8-4e07-a973-6b14cbcb2b7e 0 >nul 2>&1
 powercfg /setdcvalueindex %ACTIVE_SCHEME% 7516b95f-f776-4464-8c53-06167f40cc99 3c0bc021-c8a8-4e07-a973-6b14cbcb2b7e 0 >nul 2>&1
 powercfg /setactive %ACTIVE_SCHEME% >nul 2>&1
@@ -335,7 +338,7 @@ powercfg /change standby-timeout-dc 0 >nul 2>&1
 :: 최대 절전 타임아웃 비활성화 (AC 및 DC 모두)
 powercfg /change hibernate-timeout-ac 0 >nul 2>&1
 powercfg /change hibernate-timeout-dc 0 >nul 2>&1
-:: powercfg 설정을 통해서도 추가 설정
+:: powercfg 설정에 추가해도 추가 설정
 powercfg /setacvalueindex %ACTIVE_SCHEME% 238c9fa8-0aad-41ed-83f4-97be242c8f20 29f6c1db-86da-48c5-9fdb-f2b67b1f44da 0 >nul 2>&1
 powercfg /setdcvalueindex %ACTIVE_SCHEME% 238c9fa8-0aad-41ed-83f4-97be242c8f20 29f6c1db-86da-48c5-9fdb-f2b67b1f44da 0 >nul 2>&1
 powercfg /setacvalueindex %ACTIVE_SCHEME% 238c9fa8-0aad-41ed-83f4-97be242c8f20 9d7815a6-7ee4-497e-8888-515a05f02364 0 >nul 2>&1
@@ -351,7 +354,7 @@ goto MAIN_MENU
 
 :: ============================================
 :: 메뉴 4: 성능 최적화
-:: - 시각 효과 최적화 (4개 항목만 활성화)
+:: - 시각 효과 최적화(4개만 항목 활성화)
 :: - 시작 및 복구 설정 변경
 :: ============================================
 :MENU_4
@@ -380,7 +383,7 @@ echo.
 echo Processing performance optimization...
 echo.
 
-:: 시각 효과 최적화 (4개 항목만 활성화)
+:: 시각 효과 최적화(4개만 항목 활성화)
 echo [1/2] Optimizing visual effects...
 :: 사용자 지정 시각 효과 모드로 설정
 reg.exe add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v "VisualFXSetting" /t REG_DWORD /d "3" /f >nul 2>&1
@@ -400,11 +403,11 @@ reg.exe add "HKEY_CURRENT_USER\Software\Microsoft\Windows\DWM" /v "AlwaysHiberna
 :: 1. 바탕 화면 아이콘 레이블에 그림자 사용
 reg.exe add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v "ListviewShadow" /t REG_DWORD /d "1" /f >nul 2>&1
 
-:: 2. 아이콘 대신 미리 보기로 표시
+:: 2. 아이콘 대신 미리 보기를 표시
 reg.exe add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v "IconsOnly" /t REG_DWORD /d "0" /f >nul 2>&1
 
 :: 3. 창 아래에 그림자 표시 (UserPreferencesMask에 포함)
-:: 4. 화면 글꼴의 가장자리 다듬기 (ClearType 활성화)
+:: 4. 화면 글꼴의 가장자리 다듬기(ClearType 활성화)
 reg.exe add "HKEY_CURRENT_USER\Control Panel\Desktop" /v "FontSmoothing" /t REG_SZ /d "2" /f >nul 2>&1
 reg.exe add "HKEY_CURRENT_USER\Control Panel\Desktop" /v "FontSmoothingType" /t REG_DWORD /d "2" /f >nul 2>&1
 
@@ -420,8 +423,8 @@ echo [2/2] Configuring startup and recovery settings...
 reg.exe add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Configuration Manager" /v "Timeout" /t REG_DWORD /d "3" /f >nul 2>&1
 bcdedit /timeout 3 >nul 2>&1
 
-:: 디버깅 정보를 작은 메모리 덤프(256KB)로 설정
-:: CrashDumpEnabled: 3 = 작은 메모리 덤프
+:: 디버그 정보를 소형 메모리 덤프(256KB)로 설정
+:: CrashDumpEnabled: 3 = 소형 메모리 덤프
 reg.exe add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl" /v "CrashDumpEnabled" /t REG_DWORD /d "3" /f >nul 2>&1
 reg.exe add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl" /v "MinidumpDir" /t REG_EXPAND_SZ /d "%%SystemRoot%%\Minidump" /f >nul 2>&1
 
@@ -442,8 +445,8 @@ goto MAIN_MENU
 
 :: ============================================
 :: 메뉴 5: 시스템 및 파일 탐색기 설정
-:: - PC 이름 변경 (VMFort-VDI)
-:: - 파일 탐색기 기본 위치 변경 (내 PC)
+:: - PC 이름 변경(VMFort-VDI)
+:: - 파일 탐색기 기본 위치 변경(이 PC)
 :: - 개인 정보 보호 옵션 비활성화
 :: - 파일 탐색기 기록 지우기
 :: ============================================
@@ -542,7 +545,7 @@ goto MAIN_MENU
 :: 메뉴 6: 바탕화면 및 잠금화면 설정
 :: - 배경 개인 설정 (사진 모드)
 :: - 색 설정 (투명 효과 비활성화, 다크/라이트 모드)
-:: - 바탕화면 아이콘 추가 (제어판, 내 PC)
+:: - 바탕화면 아이콘 추가 (제어판, 이 PC)
 :: - 잠금 화면 설정 (사진 모드, 팁 비활성화)
 :: ============================================
 :MENU_6
@@ -654,7 +657,7 @@ goto MAIN_MENU
 
 :: ============================================
 :: 메뉴 7: 시작 메뉴 및 작업 표시줄 설정
-:: - 시작 메뉴 설정 (최근 앱, 추천 비활성화)
+:: - 시작 메뉴 설정 (최근 앱 및 추천 비활성화)
 :: - 작업 표시줄 설정 (검색, 위젯, 작업 보기)
 :: - 알림 설정 (팁 및 추천 비활성화)
 :: ============================================
@@ -766,7 +769,7 @@ goto MAIN_MENU
 
 :: ============================================
 :: 메뉴 8: 시작 프로그램 및 개인 정보 설정
-:: - 시작 프로그램 관리 (VMFort만 활성화)
+:: - 시작 프로그램 관리(VMFort만 활성화)
 :: - 개인 정보 일반 설정 (광고 ID, 추적 비활성화)
 :: - 피드백 및 진단 설정
 :: - 검색 개인 정보 설정
@@ -916,14 +919,14 @@ pause >nul
 goto MAIN_MENU
 
 :: ============================================
-:: 메뉴 9: 불필요한 파일 삭제 및 용량 최적화
+:: 메뉴 9: 불필요한 파일 및 공간 정리 및 저장 최적화
 :: - Windows Update 정리
 :: - 임시 파일 정리 (C, D 드라이브)
 :: - 디스크 정리 (매우 낮은 디스크 모드)
 :: - 휴지통 비우기
 :: - 관리 공유 비활성화
 :: - 이벤트 로그 정리
-:: - 복원 지점 삭제
+:: - 복원 지점 모두 삭제
 :: ============================================
 :MENU_9
 cls
@@ -1055,6 +1058,7 @@ goto MAIN_MENU
 :: 프로그램 종료
 :: ============================================
 :EXIT_PROGRAM
+echo Exiting >> QuickVM_debug.log
 cls
 echo.
 echo ========================================
@@ -1062,6 +1066,4 @@ echo  Thank you for using QuickVM!
 echo ========================================
 echo.
 timeout /t 2 >nul
-exit /b
-
-:END
+exit

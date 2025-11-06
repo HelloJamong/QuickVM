@@ -1,0 +1,21 @@
+# Log files
+*.log
+QuickVM_execution.log
+QuickVM_debug.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Windows thumbnail cache
+Thumbs.db
+
+# Test files
+*_test.bat
+*_fixed.bat
+TEST*.bat
+test*.txt
+*_ANSI.bat
+
+# Claude Code settings
+.claude/
