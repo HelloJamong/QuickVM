@@ -941,6 +941,7 @@ echo  - Recycle Bin cleanup (all drives)
 echo  - Disable administrative shares (C$, D$, ADMIN$, IPC$)
 echo  - Event log cleanup
 echo  - Delete all system restore points
+echo  - Disable scheduled drive optimization (not needed for SSD/VM)
 echo.
 echo NOTE: This operation may take several minutes.
 echo       Some operations are irreversible (restore points).
@@ -955,27 +956,37 @@ echo  Please wait, this may take a while...
 echo ========================================
 echo.
 
-echo [1/11] Preparing cleanup operations...
+echo [1/12] Preparing cleanup operations...
 timeout /t 2 >nul
 echo Ready to start
 
-echo [2/11] Stopping unnecessary services temporarily...
+echo [2/12] Disabling scheduled drive optimization...
+:: Disable the ScheduledDefrag task (드라이브 최적화 예약 실행)
+schtasks /Change /TN "\Microsoft\Windows\Defrag\ScheduledDefrag" /DISABLE >nul 2>&1
+if %errorLevel% equ 0 (
+    echo Scheduled drive optimization disabled successfully
+) else (
+    echo Scheduled drive optimization task not found or already disabled
+)
+echo Scheduled drive optimization turned off
+
+echo [3/12] Stopping unnecessary services temporarily...
 net stop wuauserv >nul 2>&1
 echo Services stopped
 
-echo [3/11] Windows Update Cleanup...
+echo [4/12] Windows Update Cleanup...
 echo This may take several minutes, please wait...
 Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase >nul 2>&1
 Dism.exe /online /Cleanup-Image /SPSuperseded >nul 2>&1
 echo Windows Update cleanup completed
 
-echo [4/11] C Drive Temporary Files Cleanup...
+echo [5/12] C Drive Temporary Files Cleanup...
 del /f /s /q %temp%\* >nul 2>&1
 del /f /s /q C:\Windows\Temp\* >nul 2>&1
 del /f /s /q C:\Windows\Prefetch\* >nul 2>&1
 echo C Drive temp files cleaned
 
-echo [5/11] D Drive Temporary Files Cleanup...
+echo [6/12] D Drive Temporary Files Cleanup...
 if exist D:\ (
     del /f /s /q D:\*.tmp >nul 2>&1
     del /f /s /q D:\*.temp >nul 2>&1
@@ -988,12 +999,12 @@ if exist D:\ (
     echo D Drive not found, skipping
 )
 
-echo [6/11] C Drive Disk Cleanup...
+echo [7/12] C Drive Disk Cleanup...
 echo Running disk cleanup in very low disk mode...
 cleanmgr /verylowdisk /d C: >nul 2>&1
 echo C Drive disk cleanup completed
 
-echo [7/11] D Drive Disk Cleanup...
+echo [8/12] D Drive Disk Cleanup...
 if exist D:\ (
     cleanmgr /verylowdisk /d D: >nul 2>&1
     echo D Drive disk cleanup completed
@@ -1001,12 +1012,12 @@ if exist D:\ (
     echo D Drive not found, skipping
 )
 
-echo [8/11] Recycle Bin Cleanup...
+echo [9/12] Recycle Bin Cleanup...
 rd /s /q C:\$Recycle.Bin >nul 2>&1
 if exist D:\$Recycle.Bin rd /s /q D:\$Recycle.Bin >nul 2>&1
 echo Recycle Bin emptied
 
-echo [9/11] Disable Administrative Shares...
+echo [10/12] Disable Administrative Shares...
 :: Delete current shares
 net share C$ /delete /y >nul 2>&1
 net share D$ /delete /y >nul 2>&1
@@ -1017,11 +1028,11 @@ net share IPC$ /delete /y >nul 2>&1
 reg.exe add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" /v "AutoShareWks" /t REG_DWORD /d "0" /f >nul 2>&1
 echo Administrative shares disabled
 
-echo [10/11] Event Log Cleanup...
+echo [11/12] Event Log Cleanup...
 for /F "tokens=*" %%1 in ('wevtutil.exe el') DO wevtutil.exe cl "%%1" >nul 2>&1
 echo Event logs cleared
 
-echo [11/11] Delete Restore Points...
+echo [12/12] Delete Restore Points...
 vssadmin delete shadows /all /quiet >nul 2>&1
 echo Restore points deleted
 
