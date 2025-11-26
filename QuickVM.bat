@@ -1,13 +1,77 @@
 @echo off
-echo BATCH FILE STARTED > QuickVM_debug.log
+setlocal enabledelayedexpansion
 chcp 65001 >nul 2>&1
-echo After chcp >> QuickVM_debug.log
+
+:: ============================================
+:: 커맨드 라인 인수 처리
+:: ============================================
+:: 도움말 표시
+if /i "%~1"=="--help" goto SHOW_HELP
+if /i "%~1"=="-h" goto SHOW_HELP
+if /i "%~1"=="/?" goto SHOW_HELP
+
+:: 디버그 모드 체크
+set "DEBUG_MODE=0"
+if /i "%~1"=="--debug" set "DEBUG_MODE=1"
+if /i "%~1"=="-d" set "DEBUG_MODE=1"
+
+goto SKIP_HELP
+
+:SHOW_HELP
+cls
+echo ========================================
+echo  QuickVM - VM Optimization Tool
+echo  Version: 1.0.0
+echo ========================================
+echo.
+echo USAGE:
+echo   QuickVM.bat [OPTIONS]
+echo.
+echo OPTIONS:
+echo   --debug, -d    Enable debug mode with detailed logging
+echo   --help, -h, /? Show this help message
+echo.
+echo EXAMPLES:
+echo   QuickVM.bat              Run in normal mode (no logs)
+echo   QuickVM.bat --debug      Run in debug mode (creates log file)
+echo.
+echo DEBUG MODE:
+echo   When debug mode is enabled, a detailed log file will be
+echo   created in the same directory as QuickVM.bat
+echo.
+echo   Log file format: result_YYYYMMDD_HHMMSS.txt
+echo.
+echo NOTE:
+echo   This tool requires administrator privileges to run.
+echo.
+pause
+exit /b
+
+:SKIP_HELP
+
+:: ============================================
+:: 로깅 초기화 (디버그 모드일 때만)
+:: ============================================
+if "%DEBUG_MODE%"=="1" (
+    set "LOG_FILE=result_%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%.txt"
+    set "LOG_FILE=!LOG_FILE: =0!"
+    set "LOG_FILE=%~dp0!LOG_FILE!"
+
+    echo ======================================== > "!LOG_FILE!"
+    echo  QuickVM - Operation Log [DEBUG MODE] >> "!LOG_FILE!"
+    echo  Date: %date% %time% >> "!LOG_FILE!"
+    echo ======================================== >> "!LOG_FILE!"
+    echo. >> "!LOG_FILE!"
+
+    echo [DEBUG MODE] Logging enabled - Log file: !LOG_FILE!
+    echo.
+    timeout /t 2 >nul
+)
 
 net session >nul 2>&1
-echo After net session, errorlevel=%errorlevel% >> QuickVM_debug.log
 
 if %errorlevel% neq 0 (
-    echo Not admin >> QuickVM_debug.log
+    if "%DEBUG_MODE%"=="1" echo [ERROR] Administrator privileges required >> "%LOG_FILE%"
     cls
     echo.
     echo ========================================
@@ -19,22 +83,61 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
-echo Has admin >> QuickVM_debug.log
+if "%DEBUG_MODE%"=="1" (
+    echo [INFO] Started with administrator privileges >> "%LOG_FILE%"
+    echo. >> "%LOG_FILE%"
+)
+
+:: ============================================
+:: 로깅 함수 (디버그 모드일 때만 작동)
+:: ============================================
+goto SKIP_FUNCTIONS
+
+:LOG_SUCCESS
+if "%DEBUG_MODE%"=="1" (
+    echo [SUCCESS] %~1 >> "%LOG_FILE%"
+    if not "%~2"=="" echo          %~2 >> "%LOG_FILE%"
+)
+goto :eof
+
+:LOG_FAIL
+if "%DEBUG_MODE%"=="1" (
+    echo [FAIL] %~1 >> "%LOG_FILE%"
+    if not "%~2"=="" echo       Reason: %~2 >> "%LOG_FILE%"
+)
+goto :eof
+
+:LOG_INFO
+if "%DEBUG_MODE%"=="1" (
+    echo [INFO] %~1 >> "%LOG_FILE%"
+)
+goto :eof
+
+:LOG_SECTION
+if "%DEBUG_MODE%"=="1" (
+    echo. >> "%LOG_FILE%"
+    echo ======================================== >> "%LOG_FILE%"
+    echo  %~1 >> "%LOG_FILE%"
+    echo ======================================== >> "%LOG_FILE%"
+)
+goto :eof
+
+:SKIP_FUNCTIONS
 
 :: ============================================
 :: 메인 메뉴
 :: ============================================
 :MAIN_MENU
-echo Entered main menu >> QuickVM_debug.log
 cls
 echo ========================================
 echo  QuickVM - VM Optimization Tool
 echo  Version: 1.0.0
-echo  Last Updated: 2025-11-09
+echo  Last Updated: 2025-11-26
+if "%DEBUG_MODE%"=="1" echo  [DEBUG MODE ENABLED]
 echo ========================================
-:: 25-11-04 - 최초 코드 작성, 테스트 미진행 
+:: 25-11-04 - 최초 코드 작성, 테스트 미진행
 :: 25-11-09 - 배치파일 동작 확인, 로깅 기능 추가
-:: 25-11-26 - 백신 오탐지에 대해 알약 측 예외처리 조치 완료됨
+:: 25-11-26 - 백신 오탐지에 대해 알약 측 예외처리 조치 완료됨, 디버그 모드 로깅 기능 추가
 echo  [Main Menu]
 echo.
 echo  1. Remove unnecessary default programs
@@ -73,6 +176,7 @@ goto MAIN_MENU
 :: 메뉴 1: 불필요한 기본 프로그램 제거
 :: ============================================
 :MENU_1
+call :LOG_SECTION "Menu 1: Remove unnecessary default programs"
 cls
 echo ========================================
 echo  1. Remove unnecessary default programs
@@ -90,60 +194,113 @@ echo  - Cortana
 echo  - And other bloatware apps...
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MAIN_MENU
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 1 skipped by user"
+    goto MAIN_MENU
+)
 
 echo.
 echo Removing unnecessary programs...
 echo This may take a few minutes...
 echo.
+call :LOG_INFO "Starting removal of unnecessary programs"
 
 :: Windows 기본 앱 제거 (PowerShell AppxPackage 사용)
+set APPS_REMOVED=0
+set APPS_FAILED=0
 
 powershell.exe "get-appxpackage *3dbuilder* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *alarms* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *communicationsapps* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *feedback* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *officehub* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *getstarted* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *skypeapp* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *zunemusic* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *zune* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *maps* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *messaging* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *solitaire* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *wallet* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *connectivitystore* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *bingfinance* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *bing* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *zunevideo* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *bingnews* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *onenote* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *oneconnect* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *mspaint* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *commsphone* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *windowsphone* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *phone* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *bingsports* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *sway* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *3d* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *soundrecorder* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *bingweather* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "get-appxpackage *holographic* | remove-appxpackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *xboxapp* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *Clipchamp* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *Teams* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *MicrosoftTeams* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *Todos* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *OutlookForWindows* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *PowerAutomate* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *Xbox* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *XboxGamingOverlay* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *XboxGameOverlay* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *XboxIdentityProvider* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *XboxSpeechToTextOverlay* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *GamingApp* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *QuickAssist* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
 powershell.exe "Get-AppxPackage *Microsoft.549981C3F5F10* | Remove-AppxPackage" >nul 2>&1
+if %errorlevel% equ 0 (set /a APPS_REMOVED+=1) else (set /a APPS_FAILED+=1)
+
+call :LOG_SUCCESS "Removed bloatware apps" "Successfully removed: %APPS_REMOVED%, Failed/Not found: %APPS_FAILED%"
 
 :: OneDrive 완전 제거
 echo Removing OneDrive...
@@ -156,12 +313,18 @@ rd "%ProgramData%\Microsoft OneDrive" /s /q >nul 2>&1
 rd "C:\OneDriveTemp" /s /q >nul 2>&1
 reg.exe delete "HKEY_CLASSES_ROOT\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /f >nul 2>&1
 reg.exe delete "HKEY_CLASSES_ROOT\Wow6432Node\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}" /f >nul 2>&1
+call :LOG_SUCCESS "OneDrive removed completely"
 
 :: Windows Spotlight 및 제안 비활성화
 echo Disabling Windows Spotlight and suggestions...
 reg.exe add "HKEY_CURRENT_USER\SOFTWARE\Policies\Microsoft\Windows\CloudContent" /v "DisableWindowsSpotlightFeatures" /t REG_DWORD /d "1" /f >nul 2>&1
 reg.exe add "HKEY_CURRENT_USER\SOFTWARE\Policies\Microsoft\Windows\CloudContent" /v "DisableThirdPartySuggestions" /t REG_DWORD /d "1" /f >nul 2>&1
 reg.exe add "HKEY_CURRENT_USER\SOFTWARE\Policies\Microsoft\Windows\CloudContent" /v "DisableTailoredExperiencesWithDiagnosticData" /t REG_DWORD /d "1" /f >nul 2>&1
+if %errorlevel% equ 0 (
+    call :LOG_SUCCESS "Disabled Windows Spotlight and suggestions"
+) else (
+    call :LOG_FAIL "Failed to disable Windows Spotlight" "Registry access error"
+)
 
 echo.
 echo Task completed successfully.
@@ -173,6 +336,7 @@ goto MAIN_MENU
 :: 메뉴 2: 오른쪽 메뉴를 Windows 10 스타일로 변경
 :: ============================================
 :MENU_2
+call :LOG_SECTION "Menu 2: Change right-click menu style"
 cls
 echo ========================================
 echo  2. Change right-click menu to Windows 10 style
@@ -188,7 +352,10 @@ echo.
 echo ========================================
 set /p submenu_choice="Select menu (0-2): "
 
-if "%submenu_choice%"=="0" goto MAIN_MENU
+if "%submenu_choice%"=="0" (
+    call :LOG_INFO "Menu 2 skipped by user"
+    goto MAIN_MENU
+)
 if "%submenu_choice%"=="1" goto MENU_2_SUB_1
 if "%submenu_choice%"=="2" goto MENU_2_SUB_2
 
@@ -207,12 +374,20 @@ echo This will change the right-click context menu
 echo to Windows 10 classic style.
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MENU_2
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 2-1 skipped by user"
+    goto MENU_2
+)
 
 echo.
 echo Processing...
 :: 레지스트리 값을 추가하여 Windows 10 스타일 적용
 reg.exe add "HKEY_CURRENT_USER\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32" /f /ve >nul 2>&1
+if %errorlevel% equ 0 (
+    call :LOG_SUCCESS "Changed right-click menu to Windows 10 style" "Reboot required for changes to take effect"
+) else (
+    call :LOG_FAIL "Failed to change right-click menu style" "Registry modification failed"
+)
 
 echo.
 echo Task completed successfully.
@@ -238,12 +413,20 @@ echo This will restore the right-click context menu
 echo to Windows 11 default style.
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MENU_2
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 2-2 skipped by user"
+    goto MENU_2
+)
 
 echo.
 echo Processing...
 :: 레지스트리 키를 삭제하여 Windows 11 기본 스타일로 복원
 reg.exe delete "HKEY_CURRENT_USER\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}" /f >nul 2>&1
+if %errorlevel% equ 0 (
+    call :LOG_SUCCESS "Restored right-click menu to Windows 11 default" "Reboot required for changes to take effect"
+) else (
+    call :LOG_FAIL "Failed to restore right-click menu" "Registry key not found or access denied"
+)
 
 echo.
 echo Task completed successfully.
@@ -262,6 +445,7 @@ goto MAIN_MENU
 :: 메뉴 3: 전원 최적화 및 절전 모드 비활성화
 :: ============================================
 :MENU_3
+call :LOG_SECTION "Menu 3: Power optimization and disable sleep mode"
 cls
 echo ========================================
 echo  3. Power optimization and disable sleep mode
@@ -275,7 +459,10 @@ echo  - Disable sleep mode timeout
 echo  - Disable hibernate timeout
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MAIN_MENU
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 3 skipped by user"
+    goto MAIN_MENU
+)
 
 echo.
 echo Processing power optimization...
@@ -347,6 +534,8 @@ powercfg /setdcvalueindex %ACTIVE_SCHEME% 238c9fa8-0aad-41ed-83f4-97be242c8f20 9
 powercfg /setactive %ACTIVE_SCHEME% >nul 2>&1
 echo Sleep and hibernate timeouts disabled
 
+call :LOG_SUCCESS "Power optimization completed" "High performance plan activated, sleep/hibernate disabled"
+
 echo.
 echo Task completed successfully.
 echo Press any key to return to main menu...
@@ -359,6 +548,7 @@ goto MAIN_MENU
 :: - 시작 및 복구 설정 변경
 :: ============================================
 :MENU_4
+call :LOG_SECTION "Menu 4: Performance optimization"
 cls
 echo ========================================
 echo  4. Performance optimization
@@ -378,7 +568,10 @@ echo  - Change OS list display time: 30s to 3s
 echo  - Change debug info: Small memory dump (256KB)
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MAIN_MENU
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 4 skipped by user"
+    goto MAIN_MENU
+)
 
 echo.
 echo Processing performance optimization...
@@ -431,6 +624,8 @@ reg.exe add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\CrashControl" /
 
 echo Startup and recovery settings configured successfully
 
+call :LOG_SUCCESS "Performance optimization completed" "Visual effects optimized, startup/recovery settings configured"
+
 echo.
 echo Task completed successfully.
 echo.
@@ -452,6 +647,7 @@ goto MAIN_MENU
 :: - 파일 탐색기 기록 지우기
 :: ============================================
 :MENU_5
+call :LOG_SECTION "Menu 5: System and File Explorer settings"
 cls
 echo ========================================
 echo  5. System and File Explorer settings
@@ -472,7 +668,10 @@ echo  - Disable: Show files from Office.com
 echo  - Clear File Explorer history
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MAIN_MENU
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 5 skipped by user"
+    goto MAIN_MENU
+)
 
 echo.
 echo Processing system and File Explorer settings...
@@ -529,6 +728,8 @@ del /q /f "%APPDATA%\Microsoft\Windows\Recent\CustomDestinations\*" >nul 2>&1
 
 echo File Explorer history cleared
 
+call :LOG_SUCCESS "System and File Explorer settings completed" "PC name changed to VMFort-VDI, File Explorer configured"
+
 echo.
 echo Task completed successfully.
 echo.
@@ -550,6 +751,7 @@ goto MAIN_MENU
 :: - 잠금 화면 설정 (사진 모드, 팁 비활성화)
 :: ============================================
 :MENU_6
+call :LOG_SECTION "Menu 6: Desktop and Lock screen settings"
 cls
 echo ========================================
 echo  6. Desktop and Lock screen settings
@@ -574,7 +776,10 @@ echo  - Lock screen status: None
 echo  - Disable tips and fun facts on lock screen
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MAIN_MENU
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 6 skipped by user"
+    goto MAIN_MENU
+)
 
 echo.
 echo Processing desktop and lock screen settings...
@@ -643,6 +848,8 @@ reg.exe add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Content
 reg.exe add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v "SoftLandingEnabled" /t REG_DWORD /d "0" /f >nul 2>&1
 echo Lock screen tips and fun facts disabled
 
+call :LOG_SUCCESS "Desktop and Lock screen settings completed" "Background, colors, icons, and lock screen configured"
+
 echo.
 echo Task completed successfully.
 echo.
@@ -663,6 +870,7 @@ goto MAIN_MENU
 :: - 알림 설정 (팁 및 추천 비활성화)
 :: ============================================
 :MENU_7
+call :LOG_SECTION "Menu 7: Start menu and Taskbar settings"
 cls
 echo ========================================
 echo  7. Start menu and Taskbar settings
@@ -689,7 +897,10 @@ echo  - Disable: Recommend ways to finish setting up this device
 echo  - Disable: Get tips and suggestions when using Windows
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MAIN_MENU
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 7 skipped by user"
+    goto MAIN_MENU
+)
 
 echo.
 echo Processing Start menu, Taskbar, and Notification settings...
@@ -755,6 +966,8 @@ reg.exe add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Content
 
 echo Notification settings configured
 
+call :LOG_SUCCESS "Start menu and Taskbar settings completed" "Start menu, Taskbar, and Notification settings configured"
+
 echo.
 echo Task completed successfully.
 echo.
@@ -776,6 +989,7 @@ goto MAIN_MENU
 :: - 검색 개인 정보 설정
 :: ============================================
 :MENU_8
+call :LOG_SECTION "Menu 8: Startup programs and Privacy settings"
 cls
 echo ========================================
 echo  8. Startup programs and Privacy settings
@@ -803,7 +1017,10 @@ echo  - Disable: Microsoft account search
 echo  - Disable: Work or School account search
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MAIN_MENU
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 8 skipped by user"
+    goto MAIN_MENU
+)
 
 echo.
 echo Processing startup programs and privacy settings...
@@ -906,6 +1123,8 @@ reg.exe add "HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Search"
 
 echo Search privacy settings configured
 
+call :LOG_SUCCESS "Startup programs and Privacy settings completed" "VMFort-only startup, privacy settings configured"
+
 echo.
 echo Task completed successfully.
 echo.
@@ -930,6 +1149,7 @@ goto MAIN_MENU
 :: - 복원 지점 모두 삭제
 :: ============================================
 :MENU_9
+call :LOG_SECTION "Menu 9: Cleanup unnecessary files and optimize storage"
 cls
 echo ========================================
 echo  9. Cleanup unnecessary files and optimize storage
@@ -951,7 +1171,10 @@ echo NOTE: This operation may take several minutes.
 echo       Some operations are irreversible (restore points).
 echo.
 set /p confirm="Do you want to proceed? (Y/N): "
-if /i not "%confirm%"=="Y" goto MAIN_MENU
+if /i not "%confirm%"=="Y" (
+    call :LOG_INFO "Menu 9 skipped by user"
+    goto MAIN_MENU
+)
 
 echo.
 echo ========================================
@@ -969,8 +1192,10 @@ echo [2/12] Disabling scheduled drive optimization...
 schtasks /Change /TN "\Microsoft\Windows\Defrag\ScheduledDefrag" /DISABLE >nul 2>&1
 if %errorLevel% equ 0 (
     echo Scheduled drive optimization disabled successfully
+    call :LOG_SUCCESS "Disabled scheduled drive optimization"
 ) else (
     echo Scheduled drive optimization task not found or already disabled
+    call :LOG_INFO "Scheduled drive optimization task not found or already disabled"
 )
 echo Scheduled drive optimization turned off
 
@@ -982,6 +1207,11 @@ echo [4/12] Windows Update Cleanup...
 echo This may take several minutes, please wait...
 Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase >nul 2>&1
 Dism.exe /online /Cleanup-Image /SPSuperseded >nul 2>&1
+if %errorLevel% equ 0 (
+    call :LOG_SUCCESS "Windows Update cleanup completed"
+) else (
+    call :LOG_FAIL "Windows Update cleanup failed" "DISM error code: %errorLevel%"
+)
 echo Windows Update cleanup completed
 
 echo [5/12] C Drive Temporary Files Cleanup...
@@ -989,6 +1219,7 @@ del /f /s /q %temp%\* >nul 2>&1
 del /f /s /q C:\Windows\Temp\* >nul 2>&1
 del /f /s /q C:\Windows\Prefetch\* >nul 2>&1
 echo C Drive temp files cleaned
+call :LOG_SUCCESS "C Drive temporary files cleaned"
 
 echo [6/12] D Drive Temporary Files Cleanup...
 if exist D:\ (
@@ -999,27 +1230,33 @@ if exist D:\ (
         if exist "%%p\Temp" del /f /s /q "%%p\Temp\*" >nul 2>&1
     )
     echo D Drive temp files cleaned
+    call :LOG_SUCCESS "D Drive temporary files cleaned"
 ) else (
     echo D Drive not found, skipping
+    call :LOG_INFO "D Drive not found, skipped"
 )
 
 echo [7/12] C Drive Disk Cleanup...
 echo Running disk cleanup in very low disk mode...
 cleanmgr /verylowdisk /d C: >nul 2>&1
 echo C Drive disk cleanup completed
+call :LOG_SUCCESS "C Drive disk cleanup completed"
 
 echo [8/12] D Drive Disk Cleanup...
 if exist D:\ (
     cleanmgr /verylowdisk /d D: >nul 2>&1
     echo D Drive disk cleanup completed
+    call :LOG_SUCCESS "D Drive disk cleanup completed"
 ) else (
     echo D Drive not found, skipping
+    call :LOG_INFO "D Drive not found, skipped"
 )
 
 echo [9/12] Recycle Bin Cleanup...
 rd /s /q C:\$Recycle.Bin >nul 2>&1
 if exist D:\$Recycle.Bin rd /s /q D:\$Recycle.Bin >nul 2>&1
 echo Recycle Bin emptied
+call :LOG_SUCCESS "Recycle Bin emptied"
 
 echo [10/12] Disable Administrative Shares...
 :: Delete current shares
@@ -1031,18 +1268,23 @@ net share IPC$ /delete /y >nul 2>&1
 :: Registry modification for permanent disable (Windows Pro = Workstation)
 reg.exe add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" /v "AutoShareWks" /t REG_DWORD /d "0" /f >nul 2>&1
 echo Administrative shares disabled
+call :LOG_SUCCESS "Administrative shares disabled"
 
 echo [11/12] Event Log Cleanup...
 for /F "tokens=*" %%1 in ('wevtutil.exe el') DO wevtutil.exe cl "%%1" >nul 2>&1
 echo Event logs cleared
+call :LOG_SUCCESS "Event logs cleared"
 
 echo [12/12] Delete Restore Points...
 vssadmin delete shadows /all /quiet >nul 2>&1
 echo Restore points deleted
+call :LOG_SUCCESS "All system restore points deleted"
 
 echo.
 echo Restarting Windows Update service...
 net start wuauserv >nul 2>&1
+
+call :LOG_SUCCESS "Cleanup and storage optimization completed" "All cleanup operations finished successfully"
 
 echo.
 echo ========================================
@@ -1059,12 +1301,24 @@ goto MAIN_MENU
 :: 프로그램 종료
 :: ============================================
 :EXIT_PROGRAM
-echo Exiting >> QuickVM_debug.log
+call :LOG_INFO "Program exited by user"
+if "%DEBUG_MODE%"=="1" (
+    echo. >> "%LOG_FILE%"
+    echo ======================================== >> "%LOG_FILE%"
+    echo  End of Log >> "%LOG_FILE%"
+    echo  Completed: %date% %time% >> "%LOG_FILE%"
+    echo ======================================== >> "%LOG_FILE%"
+)
 cls
 echo.
 echo ========================================
 echo  Thank you for using QuickVM!
 echo ========================================
 echo.
-timeout /t 2 >nul
+if "%DEBUG_MODE%"=="1" (
+    echo [DEBUG MODE] Operation log saved to:
+    echo %LOG_FILE%
+    echo.
+)
+timeout /t 3 >nul
 exit
