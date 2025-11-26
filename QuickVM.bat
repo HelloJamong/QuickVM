@@ -34,6 +34,7 @@ echo  Last Updated: 2025-11-09
 echo ========================================
 :: 25-11-04 - 최초 코드 작성, 테스트 미진행 
 :: 25-11-09 - 배치파일 동작 확인, 로깅 기능 추가
+:: 25-11-26 - 백신 오탐지에 대해 알약 측 예외처리 조치 완료됨
 echo  [Main Menu]
 echo.
 echo  1. Remove unnecessary default programs
